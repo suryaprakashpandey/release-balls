@@ -1,0 +1,1095 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Release Balls</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='g' cx='.35' cy='.3' r='.75'%3E%3Cstop offset='0' stop-color='%236fdd8b'/%3E%3Cstop offset='.55' stop-color='%231f883d'/%3E%3Cstop offset='1' stop-color='%23116329'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14' fill='url(%23g)'/%3E%3Cellipse cx='11.5' cy='10' rx='4' ry='2.6' fill='%23fff' fill-opacity='.45' transform='rotate(-30 11.5 10)'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230d1117'/%3E%3Ccircle cx='16' cy='16' r='11' fill='%231f883d'/%3E%3C/svg%3E">
+<meta name="description" content="Paste a GitHub repo and race the contributors behind its releases. Export GIF, MP4 and JSON in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: GitHub-style app shell. Header bar, settings box on the left, preview box on the right, results below. */
+:root {
+  --canvas: #ffffff;
+  --canvas-subtle: #f6f8fa;
+  --canvas-inset: #f6f8fa;
+  --header: #f6f8fa;
+  --fg: #1f2328;
+  --muted: #59636e;
+  --border: #d1d9e0;
+  --border-muted: #d1d9e0b3;
+  --accent: #0969da;
+  --accent-subtle: #ddf4ff;
+  --accent-border: #54aeff66;
+  --success: #1f883d;
+  --success-hover: #1c8139;
+  --success-fg: #ffffff;
+  --danger: #d1242f;
+  --danger-subtle: #ffebe9;
+  --danger-border: #ff818266;
+  --btn: #f6f8fa;
+  --btn-hover: #eff2f5;
+  --focus: #0969da;
+  --bar: #54aeff;
+  --shadow: 0 1px 0 #1f23280a;
+  --font: "Mona Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --r: 6px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0d1117; --canvas-subtle: #151b23; --canvas-inset: #010409; --header: #010409;
+    --fg: #f0f6fc; --muted: #9198a1; --border: #3d444d; --border-muted: #3d444db3;
+    --accent: #4493f8; --accent-subtle: #388bfd1a; --accent-border: #388bfd66;
+    --success: #238636; --success-hover: #29903b; --success-fg: #ffffff;
+    --danger: #f85149; --danger-subtle: #f851491a; --danger-border: #f8514966;
+    --btn: #212830; --btn-hover: #262c36; --focus: #1f6feb; --bar: #1f6feb; --shadow: 0 0 transparent;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --canvas: #0d1117; --canvas-subtle: #151b23; --canvas-inset: #010409; --header: #010409;
+  --fg: #f0f6fc; --muted: #9198a1; --border: #3d444d; --border-muted: #3d444db3;
+  --accent: #4493f8; --accent-subtle: #388bfd1a; --accent-border: #388bfd66;
+  --success: #238636; --success-hover: #29903b; --success-fg: #ffffff;
+  --danger: #f85149; --danger-subtle: #f851491a; --danger-border: #f8514966;
+  --btn: #212830; --btn-hover: #262c36; --focus: #1f6feb; --bar: #1f6feb; --shadow: 0 0 transparent;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--canvas); color: var(--fg); font: 14px/1.5 var(--font); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font: 85% var(--mono); background: var(--canvas-subtle); border: 1px solid var(--border-muted); border-radius: 4px; padding: 1px 5px; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: -1px; }
+
+/* Header */
+.appbar { background: var(--header); border-bottom: 1px solid var(--border); padding: 12px 16px; }
+.appbar-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; color: var(--fg); }
+.logo { width: 32px; height: 32px; flex: none; }
+.brand small { font-weight: 400; color: var(--muted); font-size: 14px; }
+.appbar .grow { flex: 1; }
+.user { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.user img { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); }
+.user strong { color: var(--fg); font-weight: 600; }
+.label-pill { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 500; line-height: 20px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+main { max-width: 1280px; margin: 0 auto; padding: 0 16px; padding-block: 24px 48px; display: grid; gap: 24px; }
+.intro { display: flex; gap: 16px 24px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; padding-bottom: 24px; border-bottom: 1px solid var(--border-muted); }
+.intro h1 { font-size: 28px; font-weight: 600; margin: 8px 0 4px; text-wrap: balance; letter-spacing: -0.01em; }
+.intro p { margin: 0; color: var(--muted); max-width: 64ch; font-size: 15px; }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.label-pill.oss { color: var(--success); border-color: var(--success); }
+.intro-actions { display: flex; gap: 8px; }
+.grid { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.col { display: grid; gap: 24px; min-width: 0; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 901px) { .grid > .col:first-child { position: sticky; top: 16px; } }
+
+/* Box */
+.box { border: 1px solid var(--border); border-radius: var(--r); background: var(--canvas); min-width: 0; }
+.box-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: var(--canvas-subtle); border-bottom: 1px solid var(--border); border-radius: var(--r) var(--r) 0 0; flex-wrap: wrap; }
+.box-head h2 { font-size: 14px; font-weight: 600; margin: 0; flex: 1; }
+.box-body { padding: 16px; }
+.box-foot { padding: 12px 16px; border-top: 1px solid var(--border); }
+
+/* Forms */
+form { display: grid; gap: 16px; }
+.field > label, .field > .flabel { display: block; font-weight: 600; margin-bottom: 6px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+input[type="text"], input[type="number"], input[type="password"], select {
+  width: 100%; height: 32px; font: 14px var(--font); color: var(--fg); background: var(--canvas);
+  border: 1px solid var(--border); border-radius: var(--r); padding: 0 12px; box-shadow: inset 0 1px 0 #d1d9e033;
+}
+input::placeholder { color: var(--muted); }
+input:focus, select:focus { outline: none; border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
+input.mono { font-family: var(--mono); font-size: 13px; }
+.input-lg { height: 40px !important; font-size: 15px !important; }
+.select { position: relative; display: block; }
+.select select { appearance: none; -webkit-appearance: none; padding-right: 32px; cursor: pointer; }
+.select::after {
+  content: ""; position: absolute; right: 10px; top: 50%; width: 16px; height: 16px; transform: translateY(-50%); pointer-events: none; background: var(--muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z'/%3E%3C/svg%3E") center / 16px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z'/%3E%3C/svg%3E") center / 16px no-repeat;
+}
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; color: var(--muted); font-size: 12px; }
+.suggest button { font: 12px var(--mono); color: var(--accent); background: var(--accent-subtle); border: 1px solid transparent; border-radius: 999px; padding: 1px 10px; cursor: pointer; line-height: 20px; }
+.suggest button:hover { border-color: var(--accent-border); }
+
+/* Segmented control */
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--canvas-subtle); border: 1px solid var(--border); border-radius: var(--r); padding: 2px; }
+.seg label { position: relative; text-align: center; padding: 4px 6px; border-radius: 5px; cursor: pointer; font-weight: 500; color: var(--muted); border: 1px solid transparent; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg label:has(input:checked) { background: var(--canvas); color: var(--fg); font-weight: 600; border-color: var(--border); box-shadow: var(--shadow); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--focus); }
+
+details.more { border-top: 1px solid var(--border-muted); padding-top: 12px; }
+details.more summary { cursor: pointer; font-weight: 600; color: var(--muted); list-style: none; display: flex; align-items: center; gap: 6px; }
+details.more summary::-webkit-details-marker { display: none; }
+details.more summary::before { content: ""; width: 16px; height: 16px; background: currentColor; transition: transform .15s;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.751.751 0 01-1.042-.018.751.751 0 01-.018-1.042L9.94 8 6.22 4.28a.75.75 0 010-1.06z'/%3E%3C/svg%3E") center / 16px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.751.751 0 01-1.042-.018.751.751 0 01-.018-1.042L9.94 8 6.22 4.28a.75.75 0 010-1.06z'/%3E%3C/svg%3E") center / 16px no-repeat; }
+details.more[open] summary::before { transform: rotate(90deg); }
+details.more > div { display: grid; gap: 16px; margin-top: 12px; }
+@media (prefers-reduced-motion: reduce) { details.more summary::before { transition: none; } }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; font: 500 14px var(--font); color: var(--fg); background: var(--btn); border: 1px solid var(--border); border-radius: var(--r); cursor: pointer; white-space: nowrap; box-shadow: var(--shadow); text-decoration: none !important; }
+.btn:hover:not(:disabled) { background: var(--btn-hover); }
+.btn:disabled { color: var(--muted); cursor: not-allowed; opacity: .6; }
+.btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
+.btn-primary { background: var(--success); color: var(--success-fg); border-color: #1f23281a; font-weight: 600; }
+.btn-primary:hover:not(:disabled) { background: var(--success-hover); }
+.btn-block { width: 100%; height: 40px; font-size: 15px; }
+.btn-link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
+.btn-link:hover { text-decoration: underline; }
+.btn svg { width: 16px; height: 16px; fill: currentColor; flex: none; }
+
+/* Flash */
+.flash { border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r); padding: 10px 14px; display: flex; gap: 10px; align-items: flex-start; }
+.flash.error { border-color: var(--danger-border); background: var(--danger-subtle); color: var(--danger); }
+.spin { flex: none; width: 16px; height: 16px; margin-top: 2px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+/* Connect step */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; counter-reset: s; }
+.steps li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; counter-increment: s; }
+.steps li::before { content: counter(s); width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); background: var(--canvas-subtle); display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+.steps h3 { margin: 1px 0 6px; font-size: 14px; font-weight: 600; }
+.steps p { margin: 0 0 8px; color: var(--muted); }
+.perm { font-size: 12px; color: var(--muted); display: grid; gap: 2px; background: var(--canvas-subtle); border: 1px solid var(--border-muted); border-radius: var(--r); padding: 8px 10px; margin-top: 8px; }
+.perm b { color: var(--fg); font-weight: 600; }
+.row-inline { display: flex; gap: 8px; }
+.row-inline input { flex: 1; min-width: 0; }
+
+.onetime { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin-bottom: 20px; border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r); }
+.onetime svg { width: 16px; height: 16px; fill: var(--accent); flex: none; margin-top: 3px; }
+.onetime strong { display: block; font-size: 14px; }
+.onetime p { margin: 2px 0 0; color: var(--fg); font-size: 14px; }
+.facts { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13.5px; color: var(--fg); }
+.facts li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; }
+.facts li::before { content: ""; width: 16px; height: 16px; margin-top: 2px; background: var(--success);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.751.751 0 01.018-1.042.751.751 0 011.042-.018L6 10.94l6.72-6.72a.75.75 0 011.06 0z'/%3E%3C/svg%3E") center / 16px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.751.751 0 01.018-1.042.751.751 0 011.042-.018L6 10.94l6.72-6.72a.75.75 0 011.06 0z'/%3E%3C/svg%3E") center / 16px no-repeat; }
+
+/* Preview */
+.screen { width: 100%; max-width: 720px; margin: 0 auto; aspect-ratio: 1; border-radius: var(--r); overflow: hidden; border: 1px solid var(--border); background: #fff; }
+.screen canvas { width: 100%; height: 100%; display: block; }
+.progress { height: 6px; background: var(--canvas-subtle); border-radius: 3px; overflow: hidden; border: 1px solid var(--border-muted); }
+.progress > i { display: block; height: 100%; width: 0; background: var(--success); transition: width .1s; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.toolbar .grow { flex: 1; }
+.btn-group { display: inline-flex; }
+.btn-group .btn { border-radius: 0; margin-left: -1px; }
+.btn-group .btn:first-child { border-radius: var(--r) 0 0 var(--r); margin-left: 0; }
+.btn-group .btn:last-child { border-radius: 0 var(--r) var(--r) 0; }
+
+/* Rankings */
+.ranks { list-style: none; margin: 0; padding: 0; }
+.ranks li { display: grid; grid-template-columns: 28px 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 16px; border-top: 1px solid var(--border-muted); }
+.ranks li:first-child { border-top: 0; }
+.ranks .pos { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.ranks img { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-muted); }
+.ranks .who { min-width: 0; }
+.ranks .who a { font-weight: 600; color: var(--fg); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranks .who a:hover { color: var(--accent); }
+.ranks .meter { height: 6px; border-radius: 3px; background: var(--canvas-subtle); margin-top: 4px; overflow: hidden; }
+.ranks .meter i { display: block; height: 100%; background: var(--bar); border-radius: 3px; }
+.ranks .n { font: 600 12px var(--mono); font-variant-numeric: tabular-nums; }
+.blank { padding: 32px 16px; text-align: center; color: var(--muted); }
+.blank strong { display: block; color: var(--fg); font-size: 16px; margin-bottom: 4px; }
+pre { margin: 0; padding: 16px; overflow-x: auto; font: 12px/1.6 var(--mono); background: var(--canvas-subtle); border-radius: 0 0 var(--r) var(--r); }
+.subhead { color: var(--muted); font-size: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border-muted); }
+footer { max-width: 1280px; margin: 0 auto; padding: 0 16px; padding-block: 16px 32px; color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; border-top: 1px solid var(--border-muted); }
+details.fold > summary { list-style: none; cursor: pointer; border-bottom: 0; border-radius: var(--r); }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary h2 { display: flex; align-items: center; gap: 6px; }
+details.fold > summary h2::before { content: ""; width: 16px; height: 16px; background: var(--muted); transition: transform .15s;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.751.751 0 01-1.042-.018.751.751 0 01-.018-1.042L9.94 8 6.22 4.28a.75.75 0 010-1.06z'/%3E%3C/svg%3E") center / 16px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.751.751 0 01-1.042-.018.751.751 0 01-.018-1.042L9.94 8 6.22 4.28a.75.75 0 010-1.06z'/%3E%3C/svg%3E") center / 16px no-repeat; }
+details.fold[open] > summary { border-bottom: 1px solid var(--border); border-radius: var(--r) var(--r) 0 0; }
+details.fold[open] > summary h2::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { details.fold > summary h2::before { transition: none; } }
+.screen { max-width: 640px; }
+</style>
+</head>
+<body>
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="20" r="6" fill="#1f883d"/><circle cx="19" cy="12" r="5" fill="#0969da"/><circle cx="26" cy="22" r="4" fill="#bf3989"/></svg>
+      <span>Release Balls <small>/ contributor race</small></span>
+    </div>
+    <span class="grow"></span>
+    <a class="btn btn-sm" href="https://github.com/suryaprakashpandey/release-balls" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 01-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 010 8c0-4.42 3.58-8 8-8z"/></svg>Source</a>
+    <div class="user" id="userChip" hidden>
+      <span class="label-pill" id="rate" title="GitHub API requests left this hour"></span>
+      <img id="userAvatar" alt="">
+      <span>Signed in as <strong id="userLogin"></strong></span>
+      <button class="btn btn-sm" id="signOut" type="button">Remove token</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <div>
+      <div class="badges"><span class="label-pill oss">Open source</span><span class="label-pill">MIT license</span><span class="label-pill">Runs in your browser</span></div>
+      <h1>Race the people who shipped your release</h1>
+      <p>Paste a GitHub repository. Every contributor becomes a ball with their avatar, and the more PRs they merged, the faster it rolls. Download the race as MP4 or GIF.</p>
+    </div>
+    <div class="intro-actions">
+      <a class="btn" href="https://github.com/suryaprakashpandey/release-balls" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.751.751 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25zm0 2.445L6.615 5.5a.75.75 0 01-.564.41l-3.097.45 2.24 2.184a.75.75 0 01.216.664l-.528 3.084 2.769-1.456a.75.75 0 01.698 0l2.77 1.456-.53-3.084a.75.75 0 01.216-.664l2.24-2.183-3.096-.45a.75.75 0 01-.564-.41L8 2.694z"/></svg>Star on GitHub</a>
+      <a class="btn" href="https://github.com/suryaprakashpandey/release-balls/fork" target="_blank" rel="noopener">Fork</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="col">
+    <!-- Connect -->
+    <section class="box" id="connectBox" aria-labelledby="connectTitle">
+      <div class="box-head"><h2 id="connectTitle">Connect GitHub</h2><span class="label-pill oss">One-time setup</span></div>
+      <div class="box-body">
+        <div class="onetime">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1013 0 6.5 6.5 0 00-13 0zm4.879-2.773l4.264 2.559a.25.25 0 010 .428l-4.264 2.559A.25.25 0 016 10.559V5.442a.25.25 0 01.379-.215z"/></svg>
+          <div>
+            <strong>You only do this once.</strong>
+            <p>After you connect, your token is saved in this browser. Next time you open Release Balls, you go straight to the race.</p>
+          </div>
+        </div>
+        <ol class="steps">
+          <li>
+            <div>
+              <h3>Create a read-only token</h3>
+              <p>Release Balls reads releases and pull requests through the GitHub API, which needs a personal access token.</p>
+              <a class="btn btn-primary" id="genToken" target="_blank" rel="noopener" href="https://github.com/settings/personal-access-tokens/new?name=Release+Balls&amp;description=Read+releases+and+pull+requests+for+Release+Balls&amp;expires_in=90">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 01-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 010 8c0-4.42 3.58-8 8-8z"/></svg>
+                Generate token on GitHub
+              </a>
+              <div class="perm">
+                <span>Leave <b>Repository access</b> on <b>Public repositories</b>. No extra permissions needed.</span>
+                <span>For private repos, pick them and set <b>Contents</b> and <b>Pull requests</b> to <b>Read-only</b>.</span>
+                <span>Prefer a classic token? <a target="_blank" rel="noopener" href="https://github.com/settings/tokens/new?description=Release%20Balls&amp;scopes=">Create one with no scopes</a>.</span>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div>
+              <h3>Paste it here</h3>
+              <form id="tokenForm" autocomplete="off">
+                <div class="row-inline">
+                  <input id="tokenInput" class="mono" type="password" placeholder="github_pat_… or ghp_…" spellcheck="false" aria-label="GitHub token">
+                  <button class="btn" type="submit" id="saveToken">Connect</button>
+                </div>
+              </form>
+              <ul class="facts">
+                <li><span>Saved in a cookie on this device for 90 days. No sign-in needed on your next visit.</span></li>
+                <li><span>Only ever sent to api.github.com, never to us or anyone else.</span></li>
+                <li><span>Remove it anytime with <b>Remove token</b> in the top bar.</span></li>
+              </ul>
+            </div>
+          </li>
+        </ol>
+        <div class="flash error" id="tokenError" hidden style="margin-top:16px"></div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="box" id="settingsBox" aria-labelledby="settingsTitle" hidden>
+      <div class="box-head"><h2 id="settingsTitle">Race settings</h2></div>
+      <div class="box-body">
+        <form id="form" autocomplete="off">
+          <div class="field">
+            <label for="repo">Repository</label>
+            <input id="repo" class="mono input-lg" type="text" placeholder="https://github.com/owner/repo" value="https://github.com/pingdotgg/t3code" spellcheck="false">
+            <div class="suggest">Try
+              <button type="button" data-repo="pingdotgg/t3code">pingdotgg/t3code</button>
+              <button type="button" data-repo="astral-sh/uv">astral-sh/uv</button>
+              <button type="button" data-repo="vercel/next.js">vercel/next.js</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="flabel">What to rank</span>
+            <div class="seg" role="radiogroup" aria-label="What to rank">
+              <label><input type="radio" name="mode" value="window" checked>Time window</label>
+              <label><input type="radio" name="mode" value="releases">Releases</label>
+              <label><input type="radio" name="mode" value="tag">One tag</label>
+            </div>
+          </div>
+
+          <div class="field" data-for="window">
+            <label for="since">PRs merged in</label>
+            <span class="select"><select id="since">
+              <option value="24h">The past 24 hours</option>
+              <option value="7d" selected>The past week</option>
+              <option value="2w">The past 2 weeks</option>
+              <option value="30d">The past 30 days</option>
+              <option value="custom">Custom…</option>
+            </select></span>
+            <input id="sinceCustom" type="text" placeholder="12h, 3d, 2w or 2026-09-01" style="margin-top:8px" hidden>
+            <div class="note">GitHub search returns at most 1,000 PRs. Pick a shorter window for busy repos.</div>
+          </div>
+
+          <div class="two" data-for="releases">
+            <div class="field">
+              <label for="releases">Latest releases</label>
+              <input id="releases" type="number" min="1" max="100" value="1">
+            </div>
+            <div class="field">
+              <label for="match">Tag contains</label>
+              <input id="match" type="text" placeholder="e.g. nightly">
+            </div>
+          </div>
+
+          <div class="field" data-for="tag">
+            <label for="tag">Release tag</label>
+            <input id="tag" class="mono" type="text" placeholder="v1.2.0">
+          </div>
+          <div class="note" data-for="releases tag" style="margin-top:-8px">Counts merged PRs linked by full URL in the release notes. GitHub's generated notes work.</div>
+
+          <div class="two">
+            <div class="field">
+              <label for="metric">Score by</label>
+              <span class="select"><select id="metric">
+                <option value="author">PRs authored</option>
+                <option value="merger">PRs merged</option>
+                <option value="changes">Lines changed</option>
+              </select></span>
+            </div>
+            <div class="field">
+              <label for="top">Show top</label>
+              <input id="top" type="number" min="0" max="500" value="10">
+            </div>
+          </div>
+
+          <details class="more">
+            <summary>Filter contributors</summary>
+            <div>
+              <div class="field">
+                <label for="users">Only these users</label>
+                <input id="users" type="text" placeholder="alice, bob">
+                <div class="note">Comma-separated logins. Empty means everyone except bots. Set Show top to 0 for everyone.</div>
+              </div>
+            </div>
+          </details>
+
+          <button id="go" class="btn btn-primary btn-block" type="submit">Start the race</button>
+          <div id="status" class="flash" hidden></div>
+        </form>
+      </div>
+    </section>
+
+    <section class="box" aria-labelledby="rankTitle">
+      <div class="box-head"><h2 id="rankTitle">Rankings</h2><span class="label-pill" id="rankCount" hidden></span></div>
+      <div class="subhead" id="rankMeta" hidden></div>
+      <ol class="ranks" id="ranks"></ol>
+      <div class="blank" id="rankBlank"><strong>No race yet</strong>Start a race to see who shipped the most.</div>
+    </section>
+    </div>
+
+    <div class="col">
+    <!-- Preview -->
+    <section class="box" aria-labelledby="previewTitle">
+      <div class="box-head">
+        <h2 id="previewTitle">Preview</h2>
+        <div class="btn-group">
+          <button class="btn btn-sm" id="play" type="button" disabled>Pause</button>
+          <button class="btn btn-sm" id="restart" type="button" disabled>Restart</button>
+        </div>
+      </div>
+      <div class="box-body" style="display:grid;gap:12px">
+        <div class="screen"><canvas id="canvas" width="1080" height="1080" aria-label="Contributor race animation"></canvas></div>
+        <div class="progress" hidden><i id="bar"></i></div>
+      </div>
+      <div class="box-foot toolbar">
+        <span class="note" style="margin:0" id="exportNote">MP4 is 1080px at 60fps. GIF is 480px at 15fps. Both last 16 seconds.</span>
+        <span class="grow"></span>
+        <button class="btn btn-sm" id="dlJson" type="button" disabled>JSON</button>
+        <button class="btn btn-sm" id="dlGif" type="button" disabled>Download GIF</button>
+        <button class="btn btn-sm btn-primary" id="dlMp4" type="button" disabled>Download MP4</button>
+      </div>
+    </section>
+
+    <details class="box fold" id="yamlBox">
+      <summary class="box-head"><h2 id="yamlTitle">Automate with GitHub Actions</h2><span class="note" style="margin:0">Workflow file for these settings</span></summary>
+      <div class="subhead toolbar"><span>Save as <code>.github/workflows/release-balls.yml</code> in your repo.</span><span class="grow"></span><button class="btn btn-sm" id="copyYaml" type="button">Copy</button></div>
+      <pre id="yaml"></pre>
+    </details>
+    </div>
+  </div>
+</main>
+<footer>
+  <span>Release Balls is open source. <a href="https://github.com/suryaprakashpandey/release-balls" target="_blank" rel="noopener">View the code</a>, <a href="https://github.com/suryaprakashpandey/release-balls/issues" target="_blank" rel="noopener">report an issue</a> or send a pull request.</span>
+  <span>Based on the <a href="https://github.com/maria-rcks/release-balls" target="_blank" rel="noopener">maria-rcks/release-balls</a> action. Not affiliated with GitHub.</span>
+</footer>
+
+<script type="module">
+import { GIFEncoder, quantize, applyPalette } from "https://cdn.jsdelivr.net/npm/gifenc@1.0.3/dist/gifenc.esm.js";
+
+const $ = (s) => document.querySelector(s);
+const DURATION = 16;
+const FONT = '"Helvetica Neue", Helvetica, Arial, sans-serif';
+
+/* ---------- token (cookie) ---------- */
+const COOKIE = "rb_token";
+const cookie = {
+  get() { const m = document.cookie.match(new RegExp(`(?:^|; )${COOKIE}=([^;]*)`)); return m ? decodeURIComponent(m[1]) : ""; },
+  set(v) { document.cookie = `${COOKIE}=${encodeURIComponent(v)}; Max-Age=${90 * 86400}; Path=/; SameSite=Strict${location.protocol === "https:" ? "; Secure" : ""}`; },
+  clear() { document.cookie = `${COOKIE}=; Max-Age=0; Path=/; SameSite=Strict`; },
+};
+let api = null;
+
+function showConnect(message) {
+  api = null;
+  $("#connectBox").hidden = false;
+  $("#settingsBox").hidden = true;
+  $("#userChip").hidden = true;
+  $("#tokenError").hidden = !message;
+  if (message) $("#tokenError").textContent = message;
+  if (!scene) drawIdle("Connect GitHub to start");
+}
+function showSettings(user) {
+  $("#connectBox").hidden = true;
+  $("#settingsBox").hidden = false;
+  $("#userChip").hidden = false;
+  $("#userLogin").textContent = user.login;
+  $("#userAvatar").src = user.avatar_url;
+  updateRate();
+  if (!scene) drawIdle("Paste a repository and start the race");
+}
+function updateRate() {
+  if (api && api.remaining != null) { $("#rate").hidden = false; $("#rate").textContent = `${Number(api.remaining).toLocaleString()} / ${Number(api.limit).toLocaleString()} requests left`; }
+  else $("#rate").hidden = true;
+}
+async function connect(token) {
+  const candidate = new Api(token);
+  const { json } = await candidate.req("/user");
+  api = candidate;
+  return json;
+}
+$("#tokenForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const token = $("#tokenInput").value.trim();
+  if (!token) { showConnect("Paste the token you generated on GitHub."); return; }
+  $("#saveToken").disabled = true; $("#saveToken").textContent = "Checking…";
+  try {
+    const user = await connect(token);
+    cookie.set(token);
+    $("#tokenInput").value = "";
+    showSettings(user);
+  } catch (err) {
+    showConnect(err.status === 401 ? "GitHub did not accept that token. Check you copied all of it, or generate a new one." : err.message);
+  } finally {
+    $("#saveToken").disabled = false; $("#saveToken").textContent = "Connect";
+  }
+});
+$("#signOut").addEventListener("click", () => { cookie.clear(); showConnect(); });
+
+/* ---------- form wiring ---------- */
+const mode = () => document.querySelector('input[name="mode"]:checked').value;
+function syncMode() {
+  const m = mode();
+  document.querySelectorAll("[data-for]").forEach((el) => { el.hidden = !el.dataset.for.split(" ").includes(m); });
+  $("#sinceCustom").hidden = !(m === "window" && $("#since").value === "custom");
+  renderYaml();
+}
+document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", syncMode));
+$("#since").addEventListener("change", syncMode);
+document.querySelectorAll("[data-repo]").forEach((c) => c.addEventListener("click", () => { $("#repo").value = `https://github.com/${c.dataset.repo}`; renderYaml(); }));
+$("#form").addEventListener("input", renderYaml);
+
+function parseRepo(input) {
+  const s = input.trim().replace(/\.git$/, "").replace(/\/+$/, "");
+  const m = s.match(/^(?:https?:\/\/)?(?:www\.)?(?:github\.com\/)?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\/.*)?$/);
+  if (!m) throw new Error("Enter a repository like owner/repo or https://github.com/owner/repo.");
+  return `${m[1]}/${m[2]}`;
+}
+function sinceValue() { return $("#since").value === "custom" ? $("#sinceCustom").value.trim() : $("#since").value; }
+function readOptions() {
+  return {
+    repo: parseRepo($("#repo").value),
+    mode: mode(),
+    since: sinceValue(),
+    releases: Math.max(1, Math.min(100, parseInt($("#releases").value, 10) || 1)),
+    match: $("#match").value.trim(),
+    tag: $("#tag").value.trim(),
+    metric: $("#metric").value,
+    top: Math.max(0, parseInt($("#top").value, 10) || 0),
+    users: $("#users").value.split(",").map((u) => u.trim().toLowerCase()).filter(Boolean),
+  };
+}
+
+function renderYaml() {
+  let repo = "owner/repo";
+  try { repo = parseRepo($("#repo").value); } catch {}
+  const m = mode();
+  const w = [`repository: ${repo}`];
+  if (m === "window") w.push(`since: ${sinceValue() || "7d"}`);
+  if (m === "releases") {
+    w.push(`tag: ''`);
+    w.push(`releases: '${$("#releases").value || 1}'`);
+    if ($("#match").value.trim()) w.push(`match: ${$("#match").value.trim()}`);
+  }
+  if (m === "tag") w.push(`tag: ${$("#tag").value.trim() || "v1.0.0"}`);
+  if ($("#metric").value !== "author") w.push(`metric: ${$("#metric").value}`);
+  if (($("#top").value || "10") !== "10") w.push(`top: '${$("#top").value}'`);
+  if ($("#users").value.trim()) w.push(`users: ${$("#users").value.trim().replace(/\s+/g, "")}`);
+  w.push("format: both");
+  $("#yaml").textContent =
+`name: Release Balls
+on:
+  workflow_dispatch:${m === "window" ? `
+  schedule:
+    - cron: '0 9 * * 1'` : ""}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: maria-rcks/release-balls@v1
+        id: balls
+        with:
+${w.map((l) => "          " + l).join("\n")}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-balls
+          path: \${{ steps.balls.outputs.directory }}`;
+}
+$("#copyYaml").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("#yaml").textContent); $("#copyYaml").textContent = "Copied"; }
+  catch { const r = document.createRange(); r.selectNodeContents($("#yaml")); getSelection().removeAllRanges(); getSelection().addRange(r); $("#copyYaml").textContent = "Press ⌘C"; }
+  setTimeout(() => ($("#copyYaml").textContent = "Copy"), 1600);
+});
+
+function setStatus(text, kind = "busy") {
+  const el = $("#status");
+  if (!text) { el.hidden = true; return; }
+  el.hidden = false;
+  el.className = "flash" + (kind === "error" ? " error" : "");
+  el.innerHTML = (kind === "busy" ? '<span class="spin" aria-hidden="true"></span>' : "") + "<span></span>";
+  el.lastChild.textContent = text;
+  if (kind === "error") el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+/* ---------- GitHub API (port of src/data.rs) ---------- */
+class Api {
+  constructor(token) { this.token = token; this.remaining = null; this.limit = null; }
+  async req(path, body) {
+    const headers = { Accept: "application/vnd.github+json", Authorization: `Bearer ${this.token}` };
+    for (let attempt = 0; attempt < 4; attempt++) {
+      let res;
+      try {
+        res = await fetch(`https://api.github.com${path}`, body
+          ? { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) }
+          : { headers });
+      } catch {
+        if (attempt < 3) { await sleep(1000 * 2 ** attempt); continue; }
+        throw new Error("Could not reach the GitHub API. Check your connection.");
+      }
+      if (res.headers.get("X-RateLimit-Resource") === "core" || path === "/user") {
+        this.remaining = res.headers.get("X-RateLimit-Remaining"); this.limit = res.headers.get("X-RateLimit-Limit");
+      }
+      if (res.ok) return { json: await res.json(), link: res.headers.get("Link") || "" };
+      const fail = (msg) => Object.assign(new Error(msg), { status: res.status });
+      if (res.status === 401) throw fail("GitHub no longer accepts your token. It may have expired or been revoked. Connect a new one.");
+      const limited = (res.status === 403 || res.status === 429) && (res.headers.get("X-RateLimit-Remaining") === "0" || res.headers.get("Retry-After"));
+      if (limited) {
+        const retry = Number(res.headers.get("Retry-After"));
+        if (retry && retry <= 60 && attempt < 3) { await sleep(retry * 1000); continue; }
+        const reset = Number(res.headers.get("X-RateLimit-Reset"));
+        const mins = reset ? Math.max(1, Math.ceil((reset * 1000 - Date.now()) / 60000)) : null;
+        throw fail(`Your token hit GitHub's rate limit${mins ? `. It resets in about ${mins} min` : ""}.`);
+      }
+      if (res.status >= 500 && attempt < 3) { await sleep(1000 * 2 ** attempt); continue; }
+      if (res.status === 404) throw fail(`GitHub returned 404 for ${path.split("?")[0]}. Check the repository name. For a private repo, give your token access to it.`);
+      if (res.status === 403) throw fail(`Your token can't read ${path.split("?")[0]}. For private or organization repos, give it access and approval.`);
+      throw fail(`GitHub API returned HTTP ${res.status} for ${path.split("?")[0]}.`);
+    }
+  }
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function parallel(items, limit, work) {
+  const out = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) { const i = next++; out[i] = await work(items[i], i); }
+  }));
+  return out;
+}
+
+function actor(obj, graphql) {
+  if (!obj || !obj.login) return null;
+  const bot = graphql ? obj.__typename === "Bot" : obj.type === "Bot";
+  return bot && !obj.login.endsWith("[bot]") ? `${obj.login}[bot]` : obj.login;
+}
+function pull(item, repo, number, graphql) {
+  const merged = graphql ? item?.mergedAt : item?.merged_at;
+  if (!merged) throw new Error(`Release notes link an unmerged PR: ${repo}#${number}.`);
+  return {
+    number, title: item.title, url: graphql ? item.url : item.html_url,
+    author: actor(graphql ? item.author : item.user, graphql),
+    merger: actor(graphql ? item.mergedBy : item.merged_by, graphql),
+    merged_at: merged, additions: item.additions, deletions: item.deletions,
+  };
+}
+
+async function fetchPulls(repo, numbers, onProgress) {
+  const [owner, name] = repo.split("/");
+  const pulls = new Map();
+  try {
+    for (let i = 0; i < numbers.length; i += 50) {
+      const batch = numbers.slice(i, i + 50);
+      const fields = batch.map((n) => `p${n}: pullRequest(number:${n}) { number title url author { login __typename } mergedBy { login __typename } mergedAt additions deletions }`).join(" ");
+      const { json } = await api.req("/graphql", { query: `query($owner:String!,$name:String!) { repository(owner:$owner,name:$name) { ${fields} } }`, variables: { owner, name } });
+      if (json.errors && json.errors.length) throw new Error("graphql");
+      for (const n of batch) pulls.set(n, pull(json.data.repository[`p${n}`], repo, n, true));
+      onProgress(Math.min(numbers.length, i + 50), numbers.length);
+    }
+    return pulls;
+  } catch (e) {
+    if (e.message.startsWith("Release notes") || e.status === 401) throw e;
+    pulls.clear();
+  }
+  let done = 0;
+  await parallel(numbers, 6, async (n) => {
+    const { json } = await api.req(`/repos/${repo}/pulls/${n}`);
+    pulls.set(n, pull(json, repo, n, false));
+    onProgress(++done, numbers.length);
+  });
+  return pulls;
+}
+
+function releaseNumbers(repo, release) {
+  const body = release.body || "";
+  const esc = repo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`https://github\\.com/${esc}/pull/(\\d+)\\b`, "gi");
+  const nums = new Set();
+  for (const m of body.matchAll(re)) nums.add(Number(m[1]));
+  // Releases whose notes link no PRs are skipped by the caller rather than failing the run.
+  return [...nums].sort((a, b) => a - b);
+}
+
+function windowStart(since) {
+  const now = new Date();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(since)) {
+    const start = new Date(`${since}T00:00:00Z`);
+    if (isNaN(start)) throw new Error("That date is not valid.");
+    if (start > now) throw new Error("The start date is in the future.");
+    const label = start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+    return { start, label: `since ${label}` };
+  }
+  const m = since.match(/^([1-9][0-9]{0,3})([hdw])$/);
+  if (!m) throw new Error("Use a window like 24h, 7d, 2w, or a date like 2026-09-01.");
+  const amount = Number(m[1]);
+  const hours = m[2] === "h" ? amount : m[2] === "d" ? amount * 24 : amount * 168;
+  const [a, unit] = hours % 168 === 0 ? [hours / 168, "week"] : hours % 24 === 0 ? [hours / 24, "day"] : [hours, "hour"];
+  return { start: new Date(now - hours * 3600e3), label: a === 1 ? `in the past ${unit}` : `in the past ${a} ${unit}s` };
+}
+const iso = (d) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
+
+async function collectMerged(o, progress) {
+  const { start, label } = windowStart(o.since);
+  const q = `repo:${o.repo} is:pr is:merged merged:${iso(start)}..${iso(new Date())}`;
+  const items = new Map();
+  for (let page = 1; ; page++) {
+    progress(`Searching PRs merged ${label}…`);
+    const { json } = await api.req(`/search/issues?q=${encodeURIComponent(q)}&sort=created&order=asc&per_page=100&page=${page}`);
+    if (json.incomplete_results) throw new Error("GitHub search timed out with partial results. Try again in a moment.");
+    if (json.total_count > 1000) throw new Error(`${json.total_count.toLocaleString()} PRs were merged ${label}. GitHub search returns at most 1,000, so pick a shorter window.`);
+    for (const it of json.items) items.set(it.number, it);
+    if (json.items.length < 100 || items.size >= json.total_count) break;
+  }
+  let prs;
+  if (o.metric === "author") {
+    // Search results already carry the author; skip the per-PR lookups.
+    prs = [...items.values()].map((it) => ({ number: it.number, title: it.title, url: it.html_url, author: actor(it.user, false), merger: null, merged_at: it.pull_request?.merged_at, additions: 0, deletions: 0 }));
+  } else {
+    const nums = [...items.keys()].sort((a, b) => a - b);
+    const pulls = await fetchPulls(o.repo, nums, (d, t) => progress(`Reading pull requests ${d}/${t}…`));
+    prs = nums.map((n) => pulls.get(n));
+  }
+  return { repo: o.repo, fetched_at: new Date().toISOString(), window: true, scope: `PRs merged since ${start.toISOString()}`, releases: [{ tag: label, published_at: null, url: null, prs }] };
+}
+
+async function collectReleases(o, progress) {
+  let releases;
+  const count = o.mode === "tag" ? 1 : o.releases;
+  const pattern = o.match.toLowerCase();
+  const keep = (r) => !r.draft && r.published_at && (o.mode === "tag" || (r.tag_name || "").toLowerCase().includes(pattern));
+  if (o.mode === "tag") {
+    if (!o.tag) throw new Error("Enter a release tag.");
+    progress(`Loading release ${o.tag}…`);
+    releases = [(await api.req(`/repos/${o.repo}/releases/tags/${encodeURIComponent(o.tag)}`)).json];
+  } else {
+    releases = [];
+    let extra = 0;
+    for (let page = 1; ; page++) {
+      progress(`Loading releases (page ${page})…`);
+      const { json, link } = await api.req(`/repos/${o.repo}/releases?per_page=100&page=${page}`);
+      releases.push(...json);
+      if (!link.includes('rel="next"')) break;
+      // Releases list roughly newest first; read one extra page past the match to settle publish-date order.
+      if (releases.filter((r) => keep(r) && releaseNumbers(o.repo, r).length).length >= count && ++extra > 1) break;
+    }
+  }
+  const candidates = releases.filter(keep).sort((a, b) => b.published_at.localeCompare(a.published_at));
+  if (!candidates.length) throw new Error(o.match ? `No published releases have “${o.match}” in the tag.` : "This repository has no published releases. Use the time window instead.");
+  // Take the newest releases whose notes link PRs; note the ones skipped on the way.
+  const picked = [], skipped = [];
+  for (const r of candidates) {
+    if (picked.length >= count) break;
+    const nums = releaseNumbers(o.repo, r);
+    if (nums.length) picked.push([r, nums]); else skipped.push(r.tag_name);
+  }
+  if (!picked.length) {
+    throw new Error(o.mode === "tag"
+      ? `The release notes for ${o.tag} don't link any ${o.repo} pull requests, so there is nothing to count. Pick a tag whose notes list PRs, or use the time window.`
+      : `None of the ${skipped.length} matching release${skipped.length === 1 ? "" : "s"} link any ${o.repo} pull requests in their notes. Try another tag filter, or use the time window.`);
+  }
+  releases = picked.map(([r]) => r);
+  const membership = picked.map(([, nums]) => nums);
+  const unique = [...new Set(membership.flat())].sort((a, b) => a - b);
+  const pulls = await fetchPulls(o.repo, unique, (d, t) => progress(`Reading pull requests ${d}/${t}…`));
+  return {
+    repo: o.repo, fetched_at: new Date().toISOString(), window: false,
+    scope: "merged PRs explicitly linked in each release's notes; deduplicated per release",
+    skipped, requested: count,
+    releases: releases.map((r, i) => ({ tag: r.tag_name, published_at: r.published_at, url: r.html_url, prs: membership[i].map((n) => pulls.get(n)) })),
+  };
+}
+
+function rank(snapshot, o) {
+  const counts = new Map();
+  for (const rel of snapshot.releases) for (const pr of rel.prs) {
+    const login = o.metric === "merger" ? pr.merger : pr.author;
+    if (!login || login.endsWith("[bot]")) continue;
+    if (o.users.length && !o.users.includes(login.toLowerCase())) continue;
+    counts.set(login, (counts.get(login) || 0) + (o.metric === "changes" ? pr.additions + pr.deletions : 1));
+  }
+  const rows = [...counts].sort((a, b) => b[1] - a[1] || a[0].toLowerCase().localeCompare(b[0].toLowerCase()) || (a[0] < b[0] ? -1 : 1));
+  return o.top > 0 ? rows.slice(0, o.top) : rows;
+}
+
+/* ---------- rendering (port of src/render.rs) ---------- */
+function loadAvatar(login) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    // A stuck avatar falls back to initials instead of stalling the race.
+    const timer = setTimeout(() => { img.src = ""; resolve(null); }, 10000);
+    img.onload = () => { clearTimeout(timer); resolve(img); };
+    img.onerror = () => { clearTimeout(timer); resolve(null); };
+    img.src = `https://avatars.githubusercontent.com/${encodeURIComponent(login)}?s=256`;
+  });
+}
+const grouped = (n) => n.toLocaleString("en-US");
+
+async function buildScene(repo, subtitle, rows, metric) {
+  const m = document.createElement("canvas").getContext("2d");
+  const font = (px) => `${px}px ${FONT}`;
+  const width = (px, s) => { m.font = font(px); return m.measureText(s).width; };
+  const title = `${metric === "changes" ? "Lines changed" : "Pull requests merged"} ${subtitle}`;
+  let titleSize = 48;
+  while (titleSize > 1 && width(titleSize, title) > 1000) titleSize--;
+  const titleBottom = 80 + titleSize * 1.05;
+  const watermark = `github.com/${repo}`;
+  const wmTop = 1080 - 36 - 22 * 0.95;
+  const center = (80 + titleBottom + wmTop) / 2;
+
+  let columns = 1;
+  let ts = 1 - 0.25 * Math.min(Math.max(rows.length - 3, 0) / 9, 1);
+  if (rows.length > 12) {
+    ts = 0; let separated = false;
+    for (let c = 1; c <= Math.ceil(Math.sqrt(rows.length)); c++) {
+      const h = 800 / Math.ceil(rows.length / c);
+      const fit = Math.min(1 / c, h / 90);
+      const sep = h >= 3;
+      if ((sep && !separated) || (sep === separated && fit > ts)) { ts = fit; columns = c; separated = sep; }
+    }
+  }
+  const layoutRows = Math.ceil(Math.max(rows.length, 1) / columns);
+  const nameSize = Math.max(1, 44 * ts), countSize = Math.max(1, 25 * ts);
+  const names = rows.map(([login]) => {
+    let label = login;
+    while (width(nameSize, label) > Math.max(1, 360 * ts) && label !== "…") label = label.replace(/…$/, "").slice(0, -1) + "…";
+    return label;
+  });
+  const labelWidth = Math.max(0, ...names.map((n) => width(nameSize, n)));
+  const rowH = rows.length > 12 ? 800 / layoutRows : layoutRows <= 3 ? 250 : (500 + (layoutRows - 3) * 28) / (layoutRows - 1);
+  const avatars = await parallel(rows, 8, ([login]) => loadAvatar(login));
+  const maximum = Math.max(1, ...rows.map((r) => r[1]));
+
+  const sprites = rows.map(([login, count], i) => {
+    const column = Math.floor(i / layoutRows);
+    const colStart = column * layoutRows;
+    const colRows = Math.min(rows.length - colStart, layoutRows);
+    const row = i - colStart;
+    const cellX = 70 + column * 940 / columns;
+    const y = center + (row - (colRows - 1) / 2) * rowH;
+    let radius = Math.max(1, Math.min(76 * ts, rowH * 0.4));
+    if (rows.length > 12) radius = Math.max(1, Math.min(radius, (rowH - 1) / 2));
+    const [left, right] = rows.length <= 12
+      ? [Math.max(70 + labelWidth + 24 + 76, 350), 980]
+      : [cellX + labelWidth + 100 * ts, cellX + 940 / columns - 90 * ts];
+    const unit = metric === "changes" ? (count === 1 ? "line" : "lines") : (count === 1 ? "merge" : "merges");
+    return { login, count, name: names[i], countText: `${grouped(count)} ${unit}`, cellX, y, radius, left, span: Math.max(1, right - left), speed: count / maximum, img: avatars[i] };
+  });
+
+  // Pre-render the static background once.
+  const bg = document.createElement("canvas");
+  bg.width = bg.height = 1080;
+  const g = bg.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, 1080, 1080);
+  g.textBaseline = "top"; g.fillStyle = "#000";
+  g.font = font(titleSize); g.textAlign = "center"; g.fillText(title, 540, 80);
+  g.textAlign = "left";
+  for (const s of sprites) {
+    g.font = font(nameSize); g.fillStyle = "#000"; g.fillText(s.name, s.cellX, s.y - 43 * ts);
+    g.font = font(countSize); g.fillText(s.countText, s.cellX + 2 * ts, s.y - 43 * ts + nameSize * 0.98 + 12 * ts);
+  }
+  if (!rows.length) { g.font = font(44); g.fillText("No matching contributions", 70, 340); }
+  g.font = font(22); g.fillStyle = "rgb(163,163,163)"; g.textAlign = "right"; g.textBaseline = "alphabetic";
+  g.fillText(watermark, 1080 - 36, 1080 - 36);
+
+  // Pre-render each ball as a circular sprite.
+  for (const s of sprites) {
+    const d = Math.ceil(s.radius * 2) * 2;
+    const c = document.createElement("canvas");
+    c.width = c.height = d;
+    const x = c.getContext("2d");
+    x.beginPath(); x.arc(d / 2, d / 2, d / 2, 0, Math.PI * 2); x.clip();
+    if (s.img) {
+      const side = Math.min(s.img.naturalWidth, s.img.naturalHeight);
+      x.drawImage(s.img, (s.img.naturalWidth - side) / 2, (s.img.naturalHeight - side) / 2, side, side, 0, 0, d, d);
+    } else {
+      x.fillStyle = "#e4e4e7"; x.fillRect(0, 0, d, d);
+      x.fillStyle = "#000"; x.font = `${d * 0.32}px ${FONT}`; x.textAlign = "center"; x.textBaseline = "middle";
+      x.fillText(s.login.slice(0, 2).toUpperCase(), d / 2, d / 2);
+    }
+    s.sprite = c;
+  }
+  return { bg, sprites };
+}
+
+function drawFrame(ctx, scene, t) {
+  const k = ctx.canvas.width / 1080;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(scene.bg, 0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  ctx.imageSmoothingQuality = "high";
+  for (const s of scene.sprites) {
+    const distance = s.span * s.speed * t;
+    const phase = distance % (2 * s.span);
+    const x = s.left + (phase <= s.span ? phase : 2 * s.span - phase);
+    ctx.drawImage(s.sprite, x - s.radius, s.y - s.radius, s.radius * 2, s.radius * 2);
+  }
+}
+
+/* ---------- live preview ---------- */
+const canvas = $("#canvas");
+const ctx = canvas.getContext("2d");
+let scene = null, snapshot = null, rows = null, opts = null, playing = true, t0 = 0, pausedAt = 0;
+function loop(now) {
+  if (scene) drawFrame(ctx, scene, playing ? ((now - t0) / 1000) % DURATION : pausedAt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+$("#play").addEventListener("click", () => {
+  if (playing) { pausedAt = ((performance.now() - t0) / 1000) % DURATION; playing = false; $("#play").textContent = "Play"; }
+  else { t0 = performance.now() - pausedAt * 1000; playing = true; $("#play").textContent = "Pause"; }
+});
+$("#restart").addEventListener("click", () => { t0 = performance.now(); pausedAt = 0; });
+
+function drawIdle(msg) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 1080, 1080);
+  const colors = ["#1f883d", "#0969da", "#bf3989"];
+  colors.forEach((c, i) => { ctx.beginPath(); ctx.arc(420 + i * 120, 470, 40, 0, Math.PI * 2); ctx.fillStyle = c; ctx.globalAlpha = 0.9; ctx.fill(); });
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#59636e"; ctx.font = `34px ${FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(msg, 540, 590);
+}
+
+/* ---------- run ---------- */
+$("#form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!api) { showConnect("Connect a GitHub token first."); return; }
+  let o;
+  try { o = readOptions(); } catch (err) { setStatus(err.message, "error"); return; }
+  $("#go").disabled = true;
+  setExports(false);
+  try {
+    const progress = (msg) => setStatus(msg);
+    const snap = o.mode === "window" ? await collectMerged(o, progress) : await collectReleases(o, progress);
+    const r = rank(snap, o);
+    const subtitle = snap.window ? snap.releases[0].tag : snap.releases.length === 1 ? `in ${snap.releases[0].tag}` : `in the last ${snap.releases.length} releases`;
+    setStatus("Loading avatars…");
+    const sc = await buildScene(o.repo, subtitle, r, o.metric);
+    scene = sc; snapshot = snap; rows = r; opts = { ...o, subtitle };
+    t0 = performance.now(); playing = true; $("#play").textContent = "Pause";
+    renderRanks(snap, r, o);
+    setStatus(null);
+    setExports(true);
+  } catch (err) {
+    console.error(err);
+    if (err.status === 401) { cookie.clear(); showConnect(err.message); }
+    else setStatus(err.message || String(err), "error");
+    if (scene) setExports(true);
+  } finally {
+    $("#go").disabled = false;
+    updateRate();
+  }
+});
+
+function renderRanks(snap, r, o) {
+  const prCount = new Set(snap.releases.flatMap((x) => x.prs.map((p) => p.number))).size;
+  const scope = snap.window ? `PRs merged ${snap.releases[0].tag}` : snap.releases.map((x) => x.tag).join(", ");
+  $("#rankMeta").hidden = false;
+  let meta = `${o.repo} · ${scope} · ${prCount.toLocaleString()} PR${prCount === 1 ? "" : "s"} read`;
+  if (snap.skipped?.length) meta += ` · skipped ${snap.skipped.join(", ")} (no PR links in notes)`;
+  if (snap.requested && snap.releases.length < snap.requested) meta += ` · only ${snap.releases.length} of ${snap.requested} releases had PR links`;
+  $("#rankMeta").textContent = meta;
+  $("#rankCount").hidden = false;
+  $("#rankCount").textContent = `${r.length} contributor${r.length === 1 ? "" : "s"}`;
+  const max = Math.max(1, ...r.map((x) => x[1]));
+  const unit = o.metric === "changes" ? "lines" : o.metric === "merger" ? "merged" : "PRs";
+  $("#ranks").replaceChildren(...r.map(([login, count], i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="pos"></span><img alt="" loading="lazy"><div class="who"><a target="_blank" rel="noopener"></a><div class="meter"><i></i></div></div><span class="n"></span>`;
+    li.querySelector(".pos").textContent = i + 1;
+    li.querySelector("img").src = `https://avatars.githubusercontent.com/${encodeURIComponent(login)}?s=56`;
+    const a = li.querySelector("a"); a.href = `https://github.com/${login}`; a.textContent = login;
+    li.querySelector(".meter i").style.width = `${(count / max) * 100}%`;
+    li.querySelector(".n").textContent = `${grouped(count)} ${unit}`;
+    return li;
+  }));
+  $("#rankBlank").hidden = r.length > 0;
+  if (!r.length) $("#rankBlank").innerHTML = "<strong>No matching contributions</strong>Try a longer window, another metric, or clear the user filter.";
+}
+
+/* ---------- export ---------- */
+function setExports(on) { ["#play", "#restart", "#dlMp4", "#dlGif", "#dlJson"].forEach((s) => ($(s).disabled = !on)); }
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+const stem = () => `${opts.repo.replace("/", "-")}-${opts.metric}`;
+function showBar(p) { $(".progress").hidden = p == null; $("#bar").style.width = `${Math.round((p || 0) * 100)}%`; }
+async function busy(label, fn) {
+  setExports(false); $("#go").disabled = true;
+  try { await fn(); setStatus(null); }
+  catch (err) { console.error(err); setStatus(`${label} failed: ${err.message || err}`, "error"); }
+  finally { showBar(null); setExports(true); $("#go").disabled = false; }
+}
+
+$("#dlJson").addEventListener("click", () => {
+  const manifest = { repo: opts.repo, metric: opts.metric, subtitle: opts.subtitle, rankings: rows.map(([login, count], i) => ({ rank: i + 1, login, count })), data: snapshot };
+  download(new Blob([JSON.stringify(manifest, null, 2) + "\n"], { type: "application/json" }), `${stem()}.json`);
+});
+
+$("#dlGif").addEventListener("click", () => busy("GIF export", async () => {
+  // GIF delivery format matches the action: 480px, 15fps.
+  const size = 480, fps = 15, frames = DURATION * fps;
+  const c = document.createElement("canvas"); c.width = c.height = size;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  drawFrame(x, scene, 0);
+  const palette = quantize(x.getImageData(0, 0, size, size).data, 256);
+  const gif = GIFEncoder();
+  for (let f = 0; f < frames; f++) {
+    drawFrame(x, scene, f / fps);
+    const idx = applyPalette(x.getImageData(0, 0, size, size).data, palette);
+    gif.writeFrame(idx, size, size, f === 0 ? { palette, delay: 1000 / fps } : { delay: 1000 / fps });
+    if (f % 10 === 0) { setStatus(`Encoding GIF… ${Math.round(f / frames * 100)}%`); showBar(f / frames); await sleep(0); }
+  }
+  gif.finish();
+  download(new Blob([gif.bytes()], { type: "image/gif" }), `${stem()}.gif`);
+}));
+
+$("#dlMp4").addEventListener("click", () => busy("Video export", async () => {
+  const size = 1080, fps = 60, frames = DURATION * fps;
+  const c = document.createElement("canvas"); c.width = c.height = size;
+  const x = c.getContext("2d");
+  if ("VideoEncoder" in window) {
+    const { Muxer, ArrayBufferTarget } = await import("https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/build/mp4-muxer.mjs");
+    let config = null;
+    for (const codec of ["avc1.64002A", "avc1.640033", "avc1.4D402A", "avc1.42E034"]) {
+      const cand = { codec, width: size, height: size, bitrate: 6_000_000, framerate: fps };
+      try { if ((await VideoEncoder.isConfigSupported(cand)).supported) { config = cand; break; } } catch {}
+    }
+    if (config) {
+      const muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: "avc", width: size, height: size }, fastStart: "in-memory" });
+      let failure = null;
+      const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => (failure = e) });
+      enc.configure(config);
+      for (let f = 0; f < frames; f++) {
+        if (failure) throw failure;
+        drawFrame(x, scene, f / fps);
+        const vf = new VideoFrame(c, { timestamp: Math.round(f * 1e6 / fps), duration: Math.round(1e6 / fps) });
+        enc.encode(vf, { keyFrame: f % (fps * 2) === 0 });
+        vf.close();
+        while (enc.encodeQueueSize > 8) await sleep(1);
+        if (f % 20 === 0) { setStatus(`Encoding MP4… ${Math.round(f / frames * 100)}%`); showBar(f / frames); await sleep(0); }
+      }
+      await enc.flush();
+      if (failure) throw failure;
+      muxer.finalize();
+      download(new Blob([muxer.target.buffer], { type: "video/mp4" }), `${stem()}.mp4`);
+      return;
+    }
+  }
+  // Fallback: record the canvas in real time.
+  const type = ["video/mp4", "video/webm;codecs=vp9", "video/webm"].find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+  if (!type) throw new Error("this browser cannot encode video. Try a recent Chrome, Edge or Safari.");
+  const stream = c.captureStream(fps);
+  const rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 6_000_000 });
+  const chunks = [];
+  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  const stopped = new Promise((r) => (rec.onstop = r));
+  rec.start();
+  const start = performance.now();
+  await new Promise((resolve) => {
+    const tick = () => {
+      const t = (performance.now() - start) / 1000;
+      if (t >= DURATION) { resolve(); return; }
+      drawFrame(x, scene, t);
+      setStatus(`Recording video in real time… ${Math.round(t / DURATION * 100)}%`); showBar(t / DURATION);
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+  rec.stop(); await stopped;
+  download(new Blob(chunks, { type }), `${stem()}.${type.startsWith("video/mp4") ? "mp4" : "webm"}`);
+}));
+
+/* ---------- boot ---------- */
+syncMode();
+(async () => {
+  const saved = cookie.get();
+  if (!saved) { showConnect(); return; }
+  try { showSettings(await connect(saved)); }
+  catch (err) {
+    if (err.status === 401) { cookie.clear(); showConnect("Your saved token no longer works. It may have expired. Connect a new one."); }
+    else { api = new Api(saved); showSettings({ login: "your account", avatar_url: "" }); setStatus(err.message, "error"); }
+  }
+})();
+</script>
+</body>
+</html>
